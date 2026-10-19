@@ -110,7 +110,8 @@
       const d = resolve(m[1].replace(/^(?:el siguiente|el proximo|proximo|el|este|esta|la) /, ''), today);
       if (d) date = iso(d);
     }
-    return { tags, date, due };
+    const someday = /\b(algun dia|algundia|someday)\b/.test(fold(src));
+    return { tags, date, due, someday };
   }
 
   const api = { parse, parseTags, fold, iso };

@@ -1,6 +1,6 @@
-# Personal OS · V0
+# Personal OS · V0.2
 
-Captura rápida desde el iPhone. Escribes una línea; la app entiende `#etiquetas`, fechas y deadlines, y te deja encontrarlo todo por Inbox, Fechas, Etiquetas y Búsqueda. Los datos viven **solo en tu dispositivo**.
+Captura rápida desde el iPhone. Escribes una línea; la app entiende `#etiquetas`, fechas y deadlines, y te deja encontrarlo todo por Inbox, Fechas, Dominios y Búsqueda. Los datos viven **solo en tu dispositivo**.
 
 ## Qué entiende al capturar
 
@@ -12,6 +12,7 @@ Captura rápida desde el iPhone. Escribes una línea; la app entiende `#etiqueta
 | `15 nov`, `3 de diciembre`, `20/11` | fecha |
 | `este finde`, `la próxima semana`, `en 3 días` | fecha |
 | `antes del viernes`, `a más tardar el 15 nov`, `vence el lunes` | deadline |
+| `algún día` (en cualquier parte del texto) | va directo a Algún día |
 
 "En la mañana" no se toma como fecha. Todo se corrige en el detalle (toca una entrada).
 
@@ -24,17 +25,40 @@ Un solo tipo de entrada, en `localStorage` bajo la clave `pos.v1`:
   "id": "uuid",
   "text": "Revisar raíces del pothos el sábado #casa #plantas",
   "tags": ["casa", "plantas"],
+  "domain": null,
   "date": "2026-10-24",
   "due": null,
   "done": false, "doneAt": null,
   "createdAt": "ISO", "updatedAt": "ISO",
+  "someday": false,
+  "focus": false, "focusAt": null,
   "links": ["uuid-de-otra-entrada"]
 }
 ```
 
 - Las etiquetas salen siempre del texto: para cambiarlas, editas el texto.
 - Las relaciones son bidireccionales.
-- El export es este mismo JSON (`{ app, schema, exportedAt, items }`): legible y portable.
+- Estado: activa, algún día (`someday`) o hecha (`done`). `focus` solo aplica a activas, máximo 3.
+- `domain` solo se llena si eliges un dominio distinto para esa entrada; si no, se hereda de sus etiquetas.
+- `meta.domains` guarda tus dominios (editables) y `meta.tagDomain` qué etiqueta pertenece a qué dominio.
+- El export es este mismo JSON (`{ app, schema, exportedAt, meta, items }`): legible y portable.
+
+## Dominios
+
+7 por defecto, todos editables desde su vista (renombrar, borrar) y con "+ Nuevo dominio": Trabajo · Dinero · Cuerpo · Mente · Construir · Disfrute · Hogar y gente.
+
+- El dominio sale de tus etiquetas: asignas `#hiking → Disfrute` una vez y aplica a todo lo que lleve `#hiking`, también a lo futuro.
+- Cuando capturas con una etiqueta nueva, el aviso te ofrece "Asignar". Si lo ignoras, aparece en Dominios → "Etiquetas sin dominio", con sugerencias que aceptas de un toque (nunca se aplican solas).
+- La pestaña Dominios muestra cuánto completaste en cada uno en las últimas 4 semanas.
+- Regla de foco: de tus 3 en foco, al menos 1 no puede ser de Trabajo.
+
+## Cómo usarla
+
+- **Captura todo** sin pensar. Si es un deseo sin prisa, agrega `algún día`.
+- **Foco: máximo 3.** Son las únicas cosas que te comprometes a mover ahora. Para meter una cuarta, termina o quita una.
+- **Algún día** no es un pendiente: es tu lista abierta, sin culpa, agrupada por etiqueta.
+- **Revisión semanal (10 min):** vacía Pendientes (¿foco, algún día o borrar?), revisa tus 3 de foco y baja algo de Algún día solo si hay espacio.
+- **Etiquetas:** al escribir `#` la app sugiere las que ya existen. Entra a una etiqueta para renombrarla, fusionarla, quitarla o mandar todas sus activas a algún día.
 
 ## Publicar en GitHub Pages (desde Windows, sin instalar nada)
 

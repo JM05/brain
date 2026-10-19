@@ -44,8 +44,8 @@
     <button data-view="today">
       <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Fechas</span>
     </button>
-    <button data-view="tags">
-      <svg viewBox="0 0 24 24"><path d="M5 9h14M4 15h14M10 4L8 20M16 4l-2 16"/></svg><span>Etiquetas</span>
+    <button data-view="domains">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5V12l6 6"/></svg><span>Dominios</span>
     </button>
     <button data-view="search">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span>Buscar</span>
@@ -66,7 +66,17 @@
       <div class="fields">
         <label class="field"><span>Fecha</span><input id="fDate" type="date"><button type="button" class="clear" data-clear="fDate" aria-label="Quitar fecha">×</button></label>
         <label class="field"><span>Vence</span><input id="fDue" type="date"><button type="button" class="clear" data-clear="fDue" aria-label="Quitar vencimiento">×</button></label>
-        <label class="field switch"><span>Hecha</span><input id="fDone" type="checkbox"><i></i></label>
+      </div>
+      <div class="fields">
+        <button type="button" class="field navrow" id="fDomainRow"><span>Dominio</span><span id="fDomain" class="domval"></span><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+        <div class="field stack">
+          <div class="seg" id="fStatus" role="group" aria-label="Estado">
+            <button type="button" data-s="active">Pendiente</button>
+            <button type="button" data-s="someday">Algún día</button>
+            <button type="button" data-s="done">Hecha</button>
+          </div>
+        </div>
+        <label class="field switch"><span>★ En foco <small>máx. 3</small></span><input id="fFocus" type="checkbox"><i></i></label>
       </div>
       <section class="block">
         <h3>Relacionadas</h3>
@@ -109,7 +119,21 @@
       <button id="importBtn" class="ghostbtn">Importar desde JSON</button>
       <input id="importFile" type="file" accept="application/json,.json" hidden>
       <p class="fineprint">Tus entradas viven solo en este iPhone (almacenamiento local de la app, clave <code>pos.v1</code>). No se suben a GitHub ni a ningún servidor. Exporta con frecuencia y guarda el archivo en iCloud Drive. Importar combina por ID: agrega lo nuevo y actualiza lo más reciente; nunca borra.</p>
-      <p class="fineprint">Personal OS · V0</p>
+      <p class="fineprint">Personal OS · V0.2</p>
+    </div>
+  </div>
+
+  <!-- Selector de dominio -->
+  <div id="dpick" class="sheet" hidden>
+    <div class="backdrop" data-close></div>
+    <div class="panel" role="dialog" aria-label="Elegir dominio">
+      <div class="panel-head">
+        <span class="panel-title" id="dpickTitle">Dominio</span>
+        <span class="grab"></span>
+        <button class="textbtn strong" data-close>Omitir</button>
+      </div>
+      <p id="dpickSub" class="hint"></p>
+      <div id="dpickList" class="domgrid"></div>
     </div>
   </div>
 

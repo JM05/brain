@@ -1,6 +1,6 @@
 /* Personal OS · service worker: red primero (para que veas cada actualización), caché como respaldo sin conexión.
    No toca tus datos: esos viven en localStorage, no aquí. */
-const CACHE = 'pos-v0-1';
+const CACHE = 'pos-v0-3';
 const ASSETS = ['./', './index.html', './styles.css', './parse.js', './app.js', './manifest.webmanifest', './icon-180.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
