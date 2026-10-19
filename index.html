@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Personal OS</title>
+  <meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Personal OS">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="icon" href="icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="titlebar">
+      <button id="backBtn" class="iconbtn" aria-label="Volver" hidden>
+        <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <h1 id="title">Inbox</h1>
+      <button id="settingsBtn" class="iconbtn" aria-label="Ajustes y respaldo">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+    <form id="capture" autocomplete="off">
+      <input id="captureInput" type="text" placeholder="¿Qué tienes en mente?" enterkeyhint="send" autocapitalize="sentences" aria-label="Captura rápida">
+      <button type="submit" class="addbtn" aria-label="Guardar">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </form>
+    <div id="capturePreview" class="preview" aria-live="polite"></div>
+  </header>
+
+  <main id="main"></main>
+
+  <nav class="tabs" aria-label="Vistas">
+    <button data-view="inbox" class="active">
+      <svg viewBox="0 0 24 24"><path d="M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z"/></svg><span>Inbox</span>
+    </button>
+    <button data-view="today">
+      <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Fechas</span>
+    </button>
+    <button data-view="tags">
+      <svg viewBox="0 0 24 24"><path d="M5 9h14M4 15h14M10 4L8 20M16 4l-2 16"/></svg><span>Etiquetas</span>
+    </button>
+    <button data-view="search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span>Buscar</span>
+    </button>
+  </nav>
+
+  <!-- Detalle / edición -->
+  <div id="sheet" class="sheet" hidden>
+    <div class="backdrop" data-close></div>
+    <div class="panel" role="dialog" aria-label="Editar entrada">
+      <div class="panel-head">
+        <button id="deleteBtn" class="textbtn danger">Borrar</button>
+        <span class="grab"></span>
+        <button class="textbtn strong" data-close>Listo</button>
+      </div>
+      <textarea id="fText" rows="3" enterkeyhint="done" aria-label="Texto"></textarea>
+      <div id="fTags" class="chips"></div>
+      <div class="fields">
+        <label class="field"><span>Fecha</span><input id="fDate" type="date"><button type="button" class="clear" data-clear="fDate" aria-label="Quitar fecha">×</button></label>
+        <label class="field"><span>Vence</span><input id="fDue" type="date"><button type="button" class="clear" data-clear="fDue" aria-label="Quitar vencimiento">×</button></label>
+        <label class="field switch"><span>Hecha</span><input id="fDone" type="checkbox"><i></i></label>
+      </div>
+      <section class="block">
+        <h3>Relacionadas</h3>
+        <ul id="relList" class="minilist"></ul>
+        <button id="relAdd" class="ghostbtn">+ Relacionar con otra entrada</button>
+      </section>
+      <section class="block" id="simBlock">
+        <h3>Parecidas <small>comparten palabras o etiquetas</small></h3>
+        <ul id="simList" class="minilist"></ul>
+      </section>
+      <p id="fCreated" class="fineprint"></p>
+    </div>
+  </div>
+
+  <!-- Selector para relacionar -->
+  <div id="picker" class="sheet" hidden>
+    <div class="backdrop" data-close></div>
+    <div class="panel tall" role="dialog" aria-label="Relacionar">
+      <div class="panel-head">
+        <span class="panel-title">Relacionar con…</span>
+        <span class="grab"></span>
+        <button class="textbtn strong" data-close>Cerrar</button>
+      </div>
+      <input id="pickerInput" type="search" placeholder="Buscar entrada" aria-label="Buscar entrada">
+      <ul id="pickerList" class="minilist"></ul>
+    </div>
+  </div>
+
+  <!-- Ajustes / respaldo -->
+  <div id="settings" class="sheet" hidden>
+    <div class="backdrop" data-close></div>
+    <div class="panel" role="dialog" aria-label="Ajustes">
+      <div class="panel-head">
+        <span class="panel-title">Tus datos</span>
+        <span class="grab"></span>
+        <button class="textbtn strong" data-close>Cerrar</button>
+      </div>
+      <div id="stats" class="stats"></div>
+      <button id="exportBtn" class="primarybtn">Exportar todo (JSON)</button>
+      <button id="importBtn" class="ghostbtn">Importar desde JSON</button>
+      <input id="importFile" type="file" accept="application/json,.json" hidden>
+      <p class="fineprint">Tus entradas viven solo en este iPhone (almacenamiento local de la app, clave <code>pos.v1</code>). No se suben a GitHub ni a ningún servidor. Exporta con frecuencia y guarda el archivo en iCloud Drive. Importar combina por ID: agrega lo nuevo y actualiza lo más reciente; nunca borra.</p>
+      <p class="fineprint">Personal OS · V0</p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden><span></span><button></button></div>
+
+  <script src="parse.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>
