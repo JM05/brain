@@ -1,6 +1,6 @@
-# Personal OS · V0.2
+# Personal OS · V0.3
 
-Captura rápida desde el iPhone. Escribes una línea; la app entiende `#etiquetas`, fechas y deadlines, y te deja encontrarlo todo por Inbox, Fechas, Dominios y Búsqueda. Los datos viven **solo en tu dispositivo**.
+Captura rápida desde el iPhone. Escribes una línea; la app entiende `#etiquetas`, fechas y deadlines, y te deja encontrarlo todo por Inbox, Mapa, Dominios y Búsqueda. Los datos viven **solo en tu dispositivo**.
 
 ## Qué entiende al capturar
 
@@ -51,6 +51,19 @@ Un solo tipo de entrada, en `localStorage` bajo la clave `pos.v1`:
 - Cuando capturas con una etiqueta nueva, el aviso te ofrece "Asignar". Si lo ignoras, aparece en Dominios → "Etiquetas sin dominio", con sugerencias que aceptas de un toque (nunca se aplican solas).
 - La pestaña Dominios muestra cuánto completaste en cada uno en las últimas 4 semanas.
 - Regla de foco: de tus 3 en foco, al menos 1 no puede ser de Trabajo.
+
+## Inbox (V0.3)
+
+- Arriba, siempre: tus 3 en foco.
+- **Clasificar**: solo lo que aún no tiene lugar (sin foco, sin fecha, sin algún día). Cada entrada trae botones: ★ Foco · Fecha · Algún día · Borrar.
+- **Fechas**, **Algún día** y **Hechas** son pestañas del mismo Inbox.
+
+## Mapa
+
+- Grafo de dominios (círculos grandes) y etiquetas; el tamaño es cuántas cosas tienes ahí y el grosor de línea cuántas veces van juntas.
+- "Entradas" agrega cada entrada como punto y las relaciones como líneas punteadas. "Todo" incluye las hechas.
+- Toca un nodo para ver su detalle; arrastra para moverte y pellizca para zoom.
+- Debajo: reparto por dominio de lo que tienes sin terminar y la **revisión de etiquetas** (casi iguales, casi siempre juntas, sin dominio, dominio dudoso, entradas que mezclan dominios, usadas una vez, exceso de etiquetas). Cada sugerencia se aplica con un toque, se puede deshacer o ignorar.
 
 ## Cómo usarla
 

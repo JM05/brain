@@ -289,3 +289,97 @@ button.chip.sug small { opacity: .6; font-size: 11px; }
 .domval { flex-direction: column; align-items: flex-end; gap: 0; text-align: right; }
 .domval > span.dname { display: inline-flex; align-items: center; }
 .domval small { margin-left: 0; }
+
+/* ---------- V0.3: inbox con clasificar, mapa y revisión ---------- */
+:root { --edge: rgba(0, 0, 0, .16); }
+@media (prefers-color-scheme: dark) { :root { --edge: rgba(255, 255, 255, .2); } }
+
+.segmented.four button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 0; font-size: 13px; line-height: 1.15; }
+.segmented.four button b { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
+.segmented.four button.on b { color: var(--accent); }
+.segmented { margin-top: 14px; }
+
+.item.triage .tri { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.tri button, .tri .tri-date { position: relative; flex: 1 1 auto; min-width: 64px; padding: 7px 8px; border-radius: 9px; font-size: 13px; font-weight: 500; text-align: center; color: var(--accent); background: var(--accent-soft); cursor: pointer; }
+.tri .del { color: var(--muted); background: var(--soft); flex: 0 1 auto; }
+.tri-date input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; margin: 0; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.chip.nodom { background: transparent; border: 1px dashed var(--line); }
+.item.leaving { opacity: 0; transform: translateX(24px); transition: opacity .2s, transform .2s; }
+
+/* Barra de reparto por dominio */
+.sharebar { background: var(--card); border-radius: var(--r); padding: 12px 14px; margin-top: 10px; box-shadow: var(--shadow); }
+.sb-title { margin: 0 0 8px; font-weight: 600; font-size: 15px; }
+.sb-title small { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 4px; }
+.sb-bar { display: flex; gap: 2px; height: 12px; }
+.sb-seg { min-width: 6px; background: var(--dc); border-radius: 0; padding: 0; }
+.sb-seg:first-child { border-radius: 4px 0 0 4px; }
+.sb-seg:last-child { border-radius: 0 4px 4px 0; }
+.sb-seg:only-child { border-radius: 4px; }
+.sb-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.sb-leg { display: inline-flex; align-items: center; }
+.sb-leg b { color: var(--ink); font-weight: 600; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.sb-note { margin: 8px 0 0; }
+
+/* Controles + lienzo */
+.mapctl-row { display: flex; align-items: center; gap: 8px; margin: 12px 0 8px; }
+.segmented.mini { flex: 1; margin: 0; }
+.segmented.mini button { padding: 6px 0; font-size: 13px; }
+.togglechip { padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 500; background: var(--soft); color: var(--muted); white-space: nowrap; }
+.togglechip.on { background: var(--accent-soft); color: var(--accent); }
+#mapwrap { position: relative; height: 58vh; min-height: 320px; max-height: 620px; background: var(--card); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; }
+#mapsvg { display: block; width: 100%; height: 100%; }
+#mapg { font-family: inherit; }
+.e { stroke-linecap: round; opacity: .75; }
+.e-tt { opacity: .55; }
+.e-ee { stroke-dasharray: 4 3; opacity: .9; }
+.e.dim { opacity: .08; }
+.n { cursor: pointer; }
+.n .hit { fill: transparent; }
+.n .dot2 { fill: var(--dc); stroke: var(--card); stroke-width: 2; }
+.n-tag .dot2 { fill: color-mix(in srgb, var(--dc) 30%, var(--card)); stroke: var(--dc); stroke-width: 1.6; }
+.n-tag.nodom .dot2 { fill: var(--card); stroke: var(--muted); stroke-dasharray: 3 2; }
+.n-entry .dot2 { stroke-width: 1.5; }
+.n-entry.someday .dot2 { fill: var(--card); stroke: var(--dc); stroke-width: 2; }
+.n-entry.done .dot2 { fill: var(--muted); opacity: .5; }
+.n-entry.focus .dot2 { stroke: var(--ink); stroke-width: 2; }
+.n text { fill: var(--ink); text-anchor: middle; font-size: 1em; pointer-events: none; paint-order: stroke; stroke: var(--card); stroke-width: 3px; stroke-linejoin: round; }
+.n-domain text { font-weight: 700; font-size: 1.15em; }
+.n-domain text.cnt { fill: #fff; stroke: none; font-size: 1em; font-weight: 700; }
+.n-tag text { fill: var(--muted); }
+.n.sel .dot2 { stroke: var(--ink); stroke-width: 2.5; }
+.n.sel text, .n.sel.n-tag text { fill: var(--ink); font-weight: 700; }
+.n.dim { opacity: .18; }
+.mapzoom { position: absolute; right: 8px; top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.mapzoom button { width: 34px; height: 34px; border-radius: 10px; background: var(--bg); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-size: 18px; color: var(--ink); }
+.maplegend { position: absolute; left: 10px; right: 50px; bottom: 6px; margin: 0; font-size: 11px; color: var(--muted); pointer-events: none; }
+
+#mappanel { margin-top: 10px; }
+.mpanel { background: var(--card); border-radius: var(--r); padding: 12px 14px; box-shadow: var(--shadow); }
+.mpanel .list { box-shadow: none; margin: 10px -14px 0; border-radius: 0; border-top: 1px solid var(--line); }
+.mp-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 17px; }
+.mp-head b { flex: 1; }
+.mp-head > span { color: var(--muted); font-size: 13px; }
+.mp-sub { margin: 4px 0 6px; font-size: 13px; color: var(--muted); }
+.chip.pick { cursor: pointer; font-size: 13px; }
+.mpanel .chips .chip, .acard .chips .chip { cursor: pointer; font-size: 13px; padding: 6px 9px; }
+.chip small { opacity: .65; font-size: 11px; }
+
+/* Tarjetas de revisión */
+.acard { background: var(--card); border-radius: var(--r); padding: 12px 14px; margin-bottom: 8px; box-shadow: var(--shadow); }
+.acard p { margin: 0 0 8px; font-size: 15px; line-height: 1.45; }
+.acard p .chip { font-size: 13px; padding: 3px 7px; vertical-align: 1px; }
+.acard .chips { margin-bottom: 8px; }
+.chip.rm { color: var(--over); background: var(--over-soft); }
+.aacts { display: flex; flex-wrap: wrap; gap: 6px; }
+.aacts button { padding: 8px 12px; border-radius: 9px; font-size: 14px; font-weight: 500; background: var(--soft); }
+.aacts button.go { color: var(--accent); background: var(--accent-soft); }
+.aacts button.quiet { color: var(--muted); background: transparent; }
+#mapsvg, #mapsvg * { stroke-linecap: round; }
+#mapsvg { fill: initial; stroke: none; stroke-width: initial; width: 100%; height: 100%; }
+#mapsvg .hit { stroke: none; }
+#mapwrap { height: 64vh; }
+.maplegend { position: static; margin: 6px 4px 0; }
+#mapsvg.lowzoom .n-tag.w1 text { display: none; }
+#mapsvg.lowzoom .n-tag.w1.near text, #mapsvg.lowzoom .n-tag.w1.sel text { display: block; }
+.sharebar { margin-top: 14px; }
+#mapsvg.lowzoom .n-tag.w1.nodom text { display: block; }

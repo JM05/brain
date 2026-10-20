@@ -1,4 +1,4 @@
-/* Personal OS · V0.2 — captura, foco (máx. 3, al menos 1 fuera de Trabajo), algún día, dominios, etiquetas,
+/* Personal OS · V0.3 — captura, foco (máx. 3, al menos 1 fuera de Trabajo), algún día, dominios, etiquetas,
    relaciones, respaldo. Datos solo en este dispositivo. */
 (() => {
   'use strict';
@@ -11,7 +11,12 @@
   const $ = (s, el = document) => el.querySelector(s);
 
   /* ---------------- Dominios por defecto ---------------- */
-  const PALETTE = ['#5b6b8c', '#3f8f5b', '#c0573e', '#7a5ea8', '#c28a1e', '#d0487a', '#3c8a95', '#8a6d4f', '#4f7cc4', '#9a9a3a'];
+  // Paleta categórica validada (daltonismo y contraste) en claro y oscuro; los nombres siempre van visibles junto al color
+  const PALETTE = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
+  const DARK = { '#2a78d6': '#3987e5', '#eb6834': '#d95926', '#1baf7a': '#199e70', '#eda100': '#c98500', '#e87ba4': '#d55181', '#008300': '#008300', '#6250d6': '#9085e9', '#e34948': '#e66767' };
+  const OLD_PALETTE = ['#5b6b8c', '#3f8f5b', '#c0573e', '#7a5ea8', '#c28a1e', '#d0487a', '#3c8a95', '#8a6d4f', '#4f7cc4', '#9a9a3a'];
+  const darkMQ = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : { matches: false };
+  const col = (d) => (d ? (darkMQ.matches && DARK[d.color]) || d.color : 'var(--muted)');
   const DEFAULT_DOMAINS = [
     { id: 'trabajo', name: 'Trabajo', color: PALETTE[0] },
     { id: 'dinero', name: 'Dinero', color: PALETTE[1] },
@@ -46,6 +51,9 @@
     } catch (e) { console.error(e); }
     if (!Array.isArray(meta.domains) || !meta.domains.length) meta.domains = DEFAULT_DOMAINS.map((d) => ({ ...d }));
     if (!meta.tagDomain || typeof meta.tagDomain !== 'object') meta.tagDomain = {};
+    if (!Array.isArray(meta.auditIgnore)) meta.auditIgnore = [];
+    // Migra los colores de la V0.2 a la paleta validada
+    meta.domains.forEach((d) => { const k = OLD_PALETTE.indexOf(d.color); if (k >= 0) d.color = PALETTE[k % PALETTE.length]; });
     return { items, meta };
   }
 
@@ -245,7 +253,7 @@
   /* ---------------- Render ---------------- */
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const richText = (s) => esc(s).replace(/(^|[\s(])#([\p{L}\p{N}_-]+)/gu, (m, pre, t) => `${pre}<span class="tag" data-tag="${t.toLowerCase()}">#${t}</span>`);
-  const dot = (d) => `<i class="dot" style="--dc:${d ? d.color : 'var(--muted)'}"></i>`;
+  const dot = (d) => `<i class="dot" style="--dc:${col(d)}"></i>`;
 
   function chipsFor(it, opts = {}) {
     const t = todayISO();
@@ -281,7 +289,7 @@
   const chev = '<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>';
 
   /* Navegación: pestañas + pila para "Volver" */
-  let ui = { view: 'inbox', inboxMode: 'active', tag: null, domain: null, query: '' };
+  let ui = { view: 'inbox', inboxMode: 'triage', tag: null, domain: null, query: '' };
   let stack = [];
   const main = $('#main');
   const tabOf = (v) => (v === 'tags' ? 'domains' : v);
@@ -292,7 +300,7 @@
   function title() {
     if (ui.view === 'tags') return ui.tag ? (ui.tag === '∅' ? 'Sin etiqueta' : '#' + ui.tag) : 'Etiquetas';
     if (ui.view === 'domains' && ui.domain) return ui.domain === '∅' ? 'Sin dominio' : (domainById(ui.domain) || {}).name || 'Dominio';
-    return { inbox: 'Inbox', today: 'Fechas', domains: 'Dominios', search: 'Buscar' }[ui.view];
+    return { inbox: 'Inbox', map: 'Mapa', domains: 'Dominios', search: 'Buscar' }[ui.view];
   }
 
   function render() {
@@ -302,57 +310,74 @@
     $('#backBtn').hidden = !stack.length;
     const keepSearchFocus = ui.view === 'search' && document.activeElement && document.activeElement.id === 'searchInput';
     main.innerHTML = views[ui.view]();
+    if (ui.view === 'map') afterMapRender();
     if (keepSearchFocus) { const s = $('#searchInput'); s.focus(); s.setSelectionRange(s.value.length, s.value.length); }
+  }
+
+  const needsTriage = (i) => statusOf(i) === 'active' && !i.focus && !keyDate(i);
+  const datedItems = () => db.items.filter((i) => !i.done && keyDate(i)).sort((a, b) => keyDate(a).localeCompare(keyDate(b)));
+
+  const triageHTML = (it) => `
+    <li class="item triage" data-id="${it.id}">
+      <button class="check" aria-label="Marcar hecha"></button>
+      <div class="body"><div class="text">${richText(it.text)}</div>
+        <div class="meta">${chipsFor(it)}${domainOf(it) ? '' : '<span class="chip nodom">sin dominio</span>'}</div>
+        <div class="tri">
+          <button data-tri="focus">★ Foco</button>
+          <label class="tri-date">Fecha<input type="date" data-tri-date aria-label="Poner fecha"></label>
+          <button data-tri="someday">Algún día</button>
+          <button data-tri="delete" class="del">Borrar</button>
+        </div>
+      </div>
+    </li>`;
+
+  function datesHTML(dated) {
+    const t = todayISO();
+    const late = [], today = [], week = [], later = [];
+    dated.forEach((i) => { const n = diffDays(t, keyDate(i)); (n < 0 ? late : n === 0 ? today : n <= 7 ? week : later).push(i); });
+    if (!dated.length) return empty('Nada con fecha', 'Las capturas con "hoy", "mañana", "el sábado", "15 nov" o "antes del viernes" aparecen aquí. También puedes ponerle fecha desde Clasificar.');
+    return section('Atrasado', late, 'over') + section('Hoy', today) + section('Próximos 7 días', week) + section('Más adelante', later) +
+      (!today.length && !late.length ? '<p class="hint">Nada para hoy.</p>' : '');
   }
 
   const views = {
     inbox() {
-      const active = db.items.filter((i) => statusOf(i) === 'active');
+      const triage = db.items.filter(needsTriage).sort(newestFirst);
+      const dated = datedItems();
       const someday = db.items.filter((i) => statusOf(i) === 'someday');
       const done = db.items.filter((i) => i.done).sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
+      const focus = focusItems().sort((a, b) => a.focusAt.localeCompare(b.focusAt));
+      const ws = weekStart().toISOString();
+      const doneWeek = done.filter((i) => i.doneAt >= ws).length;
       const m = ui.inboxMode;
+
       let html = backupBanner();
-      html += `<div class="segmented">
-        <button data-mode="active" class="${m === 'active' ? 'on' : ''}">Activas · ${active.length}</button>
-        <button data-mode="someday" class="${m === 'someday' ? 'on' : ''}">Algún día · ${someday.length}</button>
-        <button data-mode="done" class="${m === 'done' ? 'on' : ''}">Hechas · ${done.length}</button></div>`;
-
-      if (m === 'active') {
-        const ws = weekStart().toISOString();
-        const doneWeek = done.filter((i) => i.doneAt >= ws).length;
-        const focus = active.filter((i) => i.focus).sort((a, b) => a.focusAt.localeCompare(b.focusAt));
-        const rest = active.filter((i) => !i.focus).sort(newestFirst);
-        const dots = focus.map((i) => dot(domainById(domainOf(i)))).join('');
-        html += `<p class="pulse"><b>${doneWeek}</b> ${doneWeek === 1 ? 'hecha' : 'hechas'} esta semana · <b>${focus.length}/${FOCUS_MAX}</b> en foco ${dots}</p>`;
-        if (focus.length === 2 && focus.every((i) => domainOf(i) === WORK) && domainById(WORK)) {
-          html += '<p class="hint nudge">Tus 2 en foco son de Trabajo. La tercera tiene que ser para ti.</p>';
-        }
-        if (!active.length) return html + empty('Mente despejada', 'Escribe arriba lo que tengas en la cabeza. Si es un deseo sin prisa, incluye <i>algún día</i>.');
-        html += focus.length
-          ? section('★ En foco', focus, 'focus', `${focus.length}/${FOCUS_MAX}`)
-          : '<p class="hint focus-hint">Elige hasta 3 cosas en foco (al menos una que no sea de Trabajo): abre una entrada y activa <b>★ En foco</b>. Lo demás puede esperar.</p>';
-        return html + section('Pendientes', rest);
+      html += `<p class="pulse"><b>${doneWeek}</b> ${doneWeek === 1 ? 'hecha' : 'hechas'} esta semana · <b>${focus.length}/${FOCUS_MAX}</b> en foco ${focus.map((i) => dot(domainById(domainOf(i)))).join('')}</p>`;
+      if (focus.length === 2 && focus.every((i) => domainOf(i) === WORK) && domainById(WORK)) {
+        html += '<p class="hint nudge">Tus 2 en foco son de Trabajo. La tercera tiene que ser para ti.</p>';
       }
+      html += focus.length
+        ? section('★ En foco', focus, 'focus', `${focus.length}/${FOCUS_MAX}`)
+        : '<p class="hint focus-hint">Nada en foco. Elige hasta 3 (al menos una que no sea de Trabajo) con <b>★ Foco</b>.</p>';
 
+      const seg = (k, label, n) => `<button data-mode="${k}" class="${m === k ? 'on' : ''}"><span>${label}</span><b>${n}</b></button>`;
+      html += `<div class="segmented four">${seg('triage', 'Clasificar', triage.length)}${seg('dates', 'Fechas', dated.length)}${seg('someday', 'Algún día', someday.length)}${seg('done', 'Hechas', done.length)}</div>`;
+
+      if (m === 'triage') {
+        if (!triage.length) return html + empty('Inbox en cero', 'Todo tiene su lugar: foco, fecha o algún día. Escribe arriba lo siguiente que tengas en la cabeza.');
+        return html + `<p class="hint">Decide a dónde va cada una. Toca el texto para editarla.</p><ul class="list">${triage.map(triageHTML).join('')}</ul>`;
+      }
+      if (m === 'dates') return html + datesHTML(dated);
       if (m === 'someday') {
-        if (!someday.length) return html + empty('Nada en algún día', 'Los deseos sin prisa viven aquí, sin presión. Escribe <i>algún día</i> al capturar o cámbialo en el detalle.');
+        if (!someday.length) return html + empty('Nada en algún día', 'Los deseos sin prisa viven aquí, sin presión. Escribe <i>algún día</i> al capturar o usa el botón en Clasificar.');
         html += '<p class="hint">Sin presión. En tu revisión semanal, sube lo que toque a foco y borra lo que ya no te emocione.</p>';
         return html + groupByDomain(someday.sort(newestFirst), { inSomeday: true, noDomain: true });
       }
-
       if (!done.length) return html + empty('Nada completado aún', 'Toca el círculo de una entrada para marcarla como hecha.');
       return html + '<div style="height:8px"></div>' + listHTML(done);
     },
 
-    today() {
-      const t = todayISO();
-      const dated = db.items.filter((i) => !i.done && keyDate(i)).sort((a, b) => keyDate(a).localeCompare(keyDate(b)));
-      const late = [], today = [], week = [], later = [];
-      dated.forEach((i) => { const n = diffDays(t, keyDate(i)); (n < 0 ? late : n === 0 ? today : n <= 7 ? week : later).push(i); });
-      if (!dated.length) return empty('Nada con fecha', 'Las capturas con "hoy", "mañana", "el sábado", "15 nov" o "antes del viernes" aparecen aquí.');
-      return section('Atrasado', late, 'over') + section('Hoy', today) + section('Próximos 7 días', week) + section('Más adelante', later) +
-        (!today.length && !late.length ? '<p class="hint">Nada para hoy.</p>' : '');
-    },
+    map() { return mapView(); },
 
     domains() {
       if (ui.domain) return domainDetail(ui.domain);
@@ -377,7 +402,7 @@
       html += rows.map((r) => {
         const name = r.d ? esc(r.d.name) : 'Sin dominio';
         const stale = mature && r.d && r.items.some((i) => !i.done) && r.done28 === 0;
-        return `<button class="domcard" data-domain="${r.id}" style="--dc:${r.d ? r.d.color : 'var(--muted)'}">
+        return `<button class="domcard" data-domain="${r.id}" style="--dc:${col(r.d)}">
           <div class="dc-head">${dot(r.d)}<b>${name}</b>${r.focus ? `<span class="dc-focus">★ ${r.focus}</span>` : ''}</div>
           <div class="dc-bar"><span style="width:${(r.done28 / maxDone) * 100}%"></span></div>
           <div class="dc-nums"><b>${r.done28}</b> hechas · ${r.active} activas · ${r.someday} algún día</div>
@@ -392,9 +417,11 @@
         if (sug.length) html += `<button class="bulkbtn strong" data-act="acceptAll">Aceptar ${sug.length} ${sug.length === 1 ? 'sugerencia' : 'sugerencias'}</button>`;
         html += '<ul class="taglist">' + um.map((t) => {
           const s = domainById(suggestFor(t));
-          return `<li data-maptag="${esc(t)}"><span class="name tag">#${esc(t)}</span>${s ? `<button class="sugbtn" data-accept="${esc(t)}" style="--dc:${s.color}">${dot(s)}${esc(s.name)} ✓</button>` : '<span class="count">elegir</span>'}${chev}</li>`;
+          return `<li data-maptag="${esc(t)}"><span class="name tag">#${esc(t)}</span>${s ? `<button class="sugbtn" data-accept="${esc(t)}" style="--dc:${col(s)}">${dot(s)}${esc(s.name)} ✓</button>` : '<span class="count">elegir</span>'}${chev}</li>`;
         }).join('') + '</ul>';
       }
+      const nAudit = auditList().length;
+      if (nAudit) html += `<button class="bulkbtn strong" data-goaudit>Revisar etiquetas · ${nAudit} ${nAudit === 1 ? 'sugerencia' : 'sugerencias'}</button>`;
       html += `<div class="rowbtns"><button class="ghostbtn" data-act="allTags">Todas las etiquetas</button><button class="ghostbtn" data-act="newDomain">+ Nuevo dominio</button></div>`;
       return html;
     },
@@ -490,6 +517,306 @@
     return `<div class="banner"><span>${days === null ? 'Aún no has respaldado tus datos.' : `Último respaldo hace ${days} días.`}</span><button data-action="export">Exportar</button></div>`;
   }
 
+  /* ---------------- Mapa ---------------- */
+  const mapUI = { scope: 'open', entries: false, sel: null, t: { x: 0, y: 0, k: 1 }, fitKey: null, pos: {}, audit: [], g: null };
+
+  function mapItems() { return db.items.filter((i) => mapUI.scope === 'all' || !i.done); }
+
+  function mapGraph() {
+    const g = window.PosMap.buildGraph({ items: mapItems(), domains: db.meta.domains, tagDomain: db.meta.tagDomain, domainOf, withEntries: mapUI.entries });
+    const pos = window.PosMap.layout(g, mapUI.pos);
+    Object.assign(mapUI.pos, pos);
+    g.nodes.forEach((n) => { n.x = pos[n.id].x; n.y = pos[n.id].y; });
+    return g;
+  }
+
+  function neighbors(g, id) {
+    const s = new Set([id]);
+    g.edges.forEach((e) => { if (e.a === id) s.add(e.b); if (e.b === id) s.add(e.a); });
+    return s;
+  }
+
+  function shareBar() {
+    const items = db.items.filter((i) => !i.done);
+    if (!items.length) return '';
+    const counts = new Map();
+    items.forEach((i) => { const d = domainOf(i) || '∅'; counts.set(d, (counts.get(d) || 0) + 1); });
+    const rows = [...db.meta.domains.map((d) => d.id), '∅'].filter((k) => counts.get(k)).map((k) => ({ k, d: domainById(k), n: counts.get(k) }));
+    const total = items.length;
+    const segs = rows.map((r) => `<button class="sb-seg" data-mapsel="${r.d ? 'd:' + r.k : ''}" style="flex:${r.n};--dc:${col(r.d)}" aria-label="${r.d ? esc(r.d.name) : 'Sin dominio'}: ${r.n}"></button>`).join('');
+    const legend = rows.slice().sort((a, b) => b.n - a.n).map((r) => `<span class="sb-leg">${dot(r.d)}${r.d ? esc(r.d.name) : 'Sin dominio'} <b>${Math.round((r.n / total) * 100)}%</b></span>`).join('');
+    const top = rows.slice().sort((a, b) => b.n - a.n)[0];
+    return `<div class="sharebar">
+      <p class="sb-title">Dónde está tu cabeza <small>${total} cosas sin terminar</small></p>
+      <div class="sb-bar">${segs}</div>
+      <div class="sb-legend">${legend}</div>
+      ${top && top.d && top.n / total >= 0.4 ? `<p class="hint sb-note">${esc(top.d.name)} concentra ${Math.round((top.n / total) * 100)}% de lo que tienes en mente.</p>` : ''}
+    </div>`;
+  }
+
+  function mapSVG(g) {
+    const sel = mapUI.sel && g.nodes.some((n) => n.id === mapUI.sel) ? mapUI.sel : null;
+    mapUI.sel = sel;
+    const near = sel ? neighbors(g, sel) : null;
+    const byId2 = new Map(g.nodes.map((n) => [n.id, n]));
+    const domColor = (n) => (n.dom ? col(domainById(n.dom)) : 'var(--muted)');
+    const dim = (id) => (near && !near.has(id) ? ' dim' : '');
+    const edges = g.edges.map((e) => {
+      const a = byId2.get(e.a), b = byId2.get(e.b);
+      const c = e.kind === 'td' || e.kind === 'ed' ? domColor(e.kind === 'td' ? a : a) : 'var(--edge)';
+      const w = e.kind === 'tt' ? Math.min(4, 0.8 + e.w * 0.7) : e.kind === 'ee' ? 2 : 1.3;
+      const hot = near && near.has(e.a) && near.has(e.b) && (e.a === sel || e.b === sel);
+      return `<line class="e e-${e.kind}${near && !hot ? ' dim' : ''}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${c}" stroke-width="${w}"/>`;
+    }).join('');
+    const order = { entry: 0, tag: 1, domain: 2 };
+    const nodes = g.nodes.slice().sort((a, b) => order[a.kind] - order[b.kind]).map((n) => {
+      const c = domColor(n);
+      const cls = `n n-${n.kind}${n.dom ? '' : ' nodom'}${n.kind === 'tag' && n.w < 2 ? ' w1' : ''}${near && near.has(n.id) ? ' near' : ''}${n.id === sel ? ' sel' : ''}${dim(n.id)}${n.done ? ' done' : ''}${n.focus ? ' focus' : ''}${n.someday ? ' someday' : ''}`;
+      const label = n.kind === 'entry' ? '' : `<text y="${(n.r + 3).toFixed(1)}" dy="1em">${esc(n.label.length > 22 ? n.label.slice(0, 21) + '…' : n.label)}</text>`;
+      const count = n.kind === 'domain' && n.w ? `<text class="cnt" dy=".35em">${n.w}</text>` : '';
+      return `<g class="${cls}" data-node="${esc(n.id)}" transform="translate(${n.x.toFixed(1)},${n.y.toFixed(1)})" style="--dc:${c}">
+        <circle class="hit" r="${Math.max(n.r + 7, 15)}"/><circle class="dot2" r="${n.r.toFixed(1)}"/>${count}${label}</g>`;
+    }).join('');
+    return `<svg id="mapsvg" role="img" aria-label="Mapa de dominios, etiquetas y entradas"><g id="mapg">${edges}${nodes}</g></svg>`;
+  }
+
+  function fitMap(g, w, h) {
+    if (!g.nodes.length) return { x: w / 2, y: h / 2, k: 1 };
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    g.nodes.forEach((n) => { x0 = Math.min(x0, n.x - n.rc); x1 = Math.max(x1, n.x + n.rc); y0 = Math.min(y0, n.y - n.r); y1 = Math.max(y1, n.y + n.r + 24); });
+    const pad = 12;
+    const k = Math.min(1.6, (w - pad * 2) / (x1 - x0), (h - pad * 2) / (y1 - y0));
+    return { k, x: w / 2 - ((x0 + x1) / 2) * k, y: h / 2 - ((y0 + y1) / 2) * k };
+  }
+
+  function applyMapTransform() {
+    const gEl = $('#mapg');
+    if (!gEl) return;
+    const { x, y, k } = mapUI.t;
+    gEl.setAttribute('transform', `translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${k.toFixed(3)})`);
+    gEl.style.fontSize = Math.max(11, 9 / k).toFixed(1) + 'px'; // etiquetas legibles aunque alejes el zoom
+    const svg = $('#mapsvg'); if (svg) svg.classList.toggle('lowzoom', k < 0.95); // de lejos solo las etiquetas con 2+ entradas
+  }
+
+  function mapPanel(g) {
+    const n = g.nodes.find((x) => x.id === mapUI.sel);
+    if (!n) return '<p class="hint">Toca un dominio o una etiqueta para ver qué hay ahí. Arrastra para moverte y pellizca para hacer zoom.</p>';
+    const items = mapItems();
+    if (n.kind === 'domain') {
+      const d = domainById(n.ref);
+      const tagW = new Map();
+      items.forEach((i) => { if (domainOf(i) === n.ref) i.tags.forEach((t) => tagW.set(t, (tagW.get(t) || 0) + 1)); });
+      const tags = [...tagW.entries()].sort((a, b) => b[1] - a[1]);
+      const its = items.filter((i) => domainOf(i) === n.ref);
+      return `<div class="mpanel"><div class="mp-head">${dot(d)}<b>${esc(d.name)}</b><span>${its.length} ${mapUI.scope === 'all' ? 'en total' : 'sin terminar'}</span></div>
+        ${tags.length ? `<div class="chips">${tags.map(([t, c]) => `<button class="chip tag" data-mapsel="t:${esc(t)}">#${esc(t)} <small>${c}</small></button>`).join('')}</div>` : ''}
+        <div class="rowbtns"><button class="ghostbtn" data-godomain="${d.id}">Ver dominio</button></div></div>`;
+    }
+    if (n.kind === 'tag') {
+      if (!n.ref) {
+        const loose = items.filter((i) => !i.tags.length && !domainOf(i));
+        return `<div class="mpanel"><div class="mp-head"><b>Sin etiqueta ni dominio</b><span>${loose.length}</span></div><p class="hint">Ábrelas para agregarles una #etiqueta o elegir su dominio.</p>${listHTML(loose)}</div>`;
+      }
+      const t = n.ref;
+      const d = domainById(db.meta.tagDomain[t]);
+      const its = items.filter((i) => i.tags.includes(t));
+      const co = new Map();
+      its.forEach((i) => i.tags.forEach((o) => { if (o !== t) co.set(o, (co.get(o) || 0) + 1); }));
+      const coTags = [...co.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+      return `<div class="mpanel"><div class="mp-head"><b class="tag">#${esc(t)}</b><button class="chip dom pick" data-maptag="${esc(t)}">${d ? dot(d) + esc(d.name) : 'Sin dominio · asignar'}</button></div>
+        ${coTags.length ? `<p class="mp-sub">Aparece junto con</p><div class="chips">${coTags.map(([o, c]) => `<button class="chip tag" data-mapsel="t:${esc(o)}">#${esc(o)} <small>${c}</small></button>`).join('')}</div>` : ''}
+        ${listHTML(its)}
+        <div class="rowbtns"><button class="ghostbtn" data-gotag="${esc(t)}">Renombrar, fusionar o quitar</button></div></div>`;
+    }
+    return '';
+  }
+
+  const DNAME = (id) => esc((domainById(id) || {}).name || id);
+  const tchip = (t) => `<span class="chip tag">#${esc(t)}</span>`;
+  function auditCard(a, k) {
+    const btn = (label, act, cls = '') => `<button class="${cls}" data-audit="${k}:${act}">${label}</button>`;
+    const ignore = btn('Ignorar', 'ignore', 'quiet');
+    switch (a.kind) {
+      case 'similar': return `<div class="acard"><p><b>Casi iguales:</b> ${tchip(a.keep)} y ${tchip(a.drop)}. Probablemente es la misma etiqueta.</p><div class="aacts">${btn(`Fusionar en #${esc(a.keep)}`, 'merge', 'go')}${ignore}</div></div>`;
+      case 'pair': return `<div class="acard"><p><b>Casi siempre juntas:</b> ${tchip(a.keep)} y ${tchip(a.drop)} aparecen juntas en ${a.co} de ${a.total} entradas. Una de las dos sobra.</p><div class="aacts">${btn(`Fusionar en #${esc(a.keep)}`, 'merge', 'go')}${btn(`Quitar #${esc(a.drop)}`, 'removeDrop')}${ignore}</div></div>`;
+      case 'unmapped': return `<div class="acard"><p><b>Sin dominio (${a.tags.length}):</b> toca una para asignarla. Si es una persona, piensa si de verdad es el tema de la entrada.</p><div class="chips">${a.tags.map((t) => `<button class="chip tag" data-maptag="${esc(t)}">#${esc(t)}</button>`).join('')}</div></div>`;
+      case 'mismatch': return `<div class="acard"><p><b>¿Dominio correcto?</b> ${tchip(a.tag)} está en ${DNAME(a.from)}, pero ${a.c} de sus ${a.of} entradas son de ${DNAME(a.to)}.</p><div class="aacts">${btn(`Mover a ${DNAME(a.to)}`, 'move', 'go')}${ignore}</div></div>`;
+      case 'mixed': return `<div class="acard"><p><b>Mezcla ${a.domains.map(DNAME).join(' y ')}:</b> “${esc(a.text.length > 70 ? a.text.slice(0, 69) + '…' : a.text)}”. ¿Por qué lo quieres hacer?</p><div class="aacts">${a.domains.map((d) => btn(DNAME(d), 'entry:' + d, 'go')).join('')}${ignore}</div></div>`;
+      case 'single': return `<div class="acard"><p><b>Usadas una sola vez (${a.tags.length})</b> y su entrada ya tiene otra etiqueta del mismo dominio. Si no las vas a reutilizar, sobran.</p><div class="chips">${a.tags.map((t) => `<button class="chip tag rm" data-audit="${k}:remove:${esc(t)}">#${esc(t)} ×</button>`).join('')}</div><div class="aacts">${ignore}</div></div>`;
+      case 'avg': return `<div class="acard"><p><b>${a.avg.toFixed(1)} etiquetas por entrada</b> en promedio. Con 1 o 2 basta: el dominio ya da el contexto y capturas más rápido.</p><div class="aacts">${btn('Entendido', 'ignore', 'quiet')}</div></div>`;
+    }
+    return '';
+  }
+
+  function auditList() {
+    return window.PosMap.audit({ items: db.items, tagDomain: db.meta.tagDomain, domainIds: new Set(db.meta.domains.map((d) => d.id)), fold, ignore: new Set(db.meta.auditIgnore) });
+  }
+
+  function mapView() {
+    if (!db.items.length) return empty('Tu mapa aparece aquí', 'Captura algunas ideas con #etiquetas y asígnalas a dominios.');
+    const g = mapGraph();
+    mapUI.g = g;
+    mapUI.audit = auditList();
+    let html = `<div class="mapctl-row">
+      <div class="segmented mini"><button data-mapscope="open" class="${mapUI.scope === 'open' ? 'on' : ''}">Sin terminar</button><button data-mapscope="all" class="${mapUI.scope === 'all' ? 'on' : ''}">Todo</button></div>
+      <button class="togglechip${mapUI.entries ? ' on' : ''}" data-mapentries>${mapUI.entries ? '✓ ' : ''}Entradas</button></div>`;
+    html += `<div id="mapwrap">${mapSVG(g)}
+      <div class="mapzoom"><button data-zoom="in" aria-label="Acercar">+</button><button data-zoom="out" aria-label="Alejar">−</button><button data-zoom="fit" aria-label="Ajustar">⤢</button></div></div>
+      <p class="maplegend">Tamaño = cuántas cosas tienes ahí · línea gruesa = van juntas seguido${mapUI.entries ? ' · punto hueco = algún día · punteada = relacionadas' : ''} · acerca para ver todas las etiquetas</p>`;
+    html += `<div id="mappanel">${mapPanel(g)}</div>`;
+    html += shareBar();
+    html += `<div class="section-title" id="audit"><span>Revisión de etiquetas</span><span>${mapUI.audit.length}</span></div>`;
+    html += mapUI.audit.length ? mapUI.audit.map(auditCard).join('') : '<p class="hint">Tus etiquetas están en orden. ✓</p>';
+    if (db.meta.auditIgnore.length) html += `<button class="bulkbtn" data-audit="x:reset">Volver a mostrar ${db.meta.auditIgnore.length} ignoradas</button>`;
+    return html;
+  }
+
+  // Después de pintar: ajustar zoom la primera vez o si cambió lo que se muestra
+  function afterMapRender() {
+    const svg = $('#mapsvg');
+    if (!svg || !mapUI.g) return;
+    const r = svg.getBoundingClientRect();
+    const key = `${mapUI.scope}|${mapUI.entries}|${Math.round(r.width)}`;
+    if (mapUI.fitKey !== key) { mapUI.t = fitMap(mapUI.g, r.width, r.height); mapUI.fitKey = key; }
+    applyMapTransform();
+  }
+
+  function selectNode(id) {
+    mapUI.sel = mapUI.sel === id ? null : id;
+    const n = mapUI.g && mapUI.g.nodes.find((x) => x.id === id);
+    if (n && n.kind === 'entry') { mapUI.sel = id; openSheet(n.ref); }
+    const y = window.scrollY;
+    render();
+    window.scrollTo(0, y);
+  }
+
+  // Gestos: arrastrar para mover, pellizcar para zoom, tocar para seleccionar
+  const ptrs = new Map();
+  let gest = null;
+  const svgPoint = (svg, x, y) => { const r = svg.getBoundingClientRect(); return { x: x - r.left, y: y - r.top }; };
+  main.addEventListener('pointerdown', (e) => {
+    const wrap = e.target.closest('#mapwrap');
+    if (!wrap || e.target.closest('.mapzoom')) return;
+    const svg = $('#mapsvg');
+    try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
+    ptrs.set(e.pointerId, svgPoint(svg, e.clientX, e.clientY));
+    const pts = [...ptrs.values()];
+    const node = e.target.closest('[data-node]');
+    gest = { t0: { ...mapUI.t }, p0: pts.map((p) => ({ ...p })), moved: ptrs.size > 1 || (gest && gest.moved && ptrs.size > 1), node: ptrs.size === 1 && node ? node.dataset.node : null };
+  });
+  main.addEventListener('pointermove', (e) => {
+    if (!gest || !ptrs.has(e.pointerId)) return;
+    const svg = $('#mapsvg');
+    if (!svg) return;
+    ptrs.set(e.pointerId, svgPoint(svg, e.clientX, e.clientY));
+    const pts = [...ptrs.values()];
+    const { t0, p0 } = gest;
+    if (pts.length === 1 && p0.length === 1) {
+      const dx = pts[0].x - p0[0].x, dy = pts[0].y - p0[0].y;
+      if (Math.hypot(dx, dy) > 6) gest.moved = true;
+      if (gest.moved) { mapUI.t = { k: t0.k, x: t0.x + dx, y: t0.y + dy }; applyMapTransform(); }
+    } else if (pts.length >= 2 && p0.length >= 2) {
+      gest.moved = true;
+      const d0 = Math.hypot(p0[1].x - p0[0].x, p0[1].y - p0[0].y) || 1;
+      const d1 = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      const m0 = { x: (p0[0].x + p0[1].x) / 2, y: (p0[0].y + p0[1].y) / 2 };
+      const m1 = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+      const k = Math.max(0.25, Math.min(5, t0.k * (d1 / d0)));
+      const s = k / t0.k;
+      mapUI.t = { k, x: m1.x - (m0.x - t0.x) * s, y: m1.y - (m0.y - t0.y) * s };
+      applyMapTransform();
+    }
+  });
+  const endPtr = (e) => {
+    if (!ptrs.has(e.pointerId)) return;
+    ptrs.delete(e.pointerId);
+    if (!gest) return;
+    if (ptrs.size === 0) {
+      const g = gest; gest = null;
+      if (!g.moved && e.type === 'pointerup') selectNode(g.node || mapUI.sel);
+    } else {
+      gest = { t0: { ...mapUI.t }, p0: [...ptrs.values()].map((p) => ({ ...p })), moved: true, node: null };
+    }
+  };
+  main.addEventListener('pointerup', endPtr);
+  main.addEventListener('pointercancel', endPtr);
+  main.addEventListener('wheel', (e) => {
+    const svg = e.target.closest('#mapsvg');
+    if (!svg) return;
+    e.preventDefault();
+    const p = svgPoint(svg, e.clientX, e.clientY);
+    const t0 = mapUI.t;
+    const k = Math.max(0.25, Math.min(5, t0.k * Math.exp(-e.deltaY * 0.0015)));
+    const s = k / t0.k;
+    mapUI.t = { k, x: p.x - (p.x - t0.x) * s, y: p.y - (p.y - t0.y) * s };
+    applyMapTransform();
+  }, { passive: false });
+
+  function mapClick(el) {
+    const z = el.closest('[data-zoom]');
+    if (z) {
+      const svg = $('#mapsvg');
+      const r = svg.getBoundingClientRect();
+      if (z.dataset.zoom === 'fit') mapUI.t = fitMap(mapUI.g, r.width, r.height);
+      else {
+        const s = z.dataset.zoom === 'in' ? 1.35 : 1 / 1.35;
+        const t0 = mapUI.t, c = { x: r.width / 2, y: r.height / 2 };
+        const k = Math.max(0.25, Math.min(5, t0.k * s));
+        mapUI.t = { k, x: c.x - (c.x - t0.x) * (k / t0.k), y: c.y - (c.y - t0.y) * (k / t0.k) };
+      }
+      applyMapTransform();
+      return true;
+    }
+    const sc = el.closest('[data-mapscope]');
+    if (sc) { mapUI.scope = sc.dataset.mapscope; mapUI.sel = null; render(); return true; }
+    if (el.closest('[data-mapentries]')) { mapUI.entries = !mapUI.entries; mapUI.sel = null; render(); return true; }
+    const ms = el.closest('[data-mapsel]');
+    if (ms) {
+      if (!ms.dataset.mapsel) return true;
+      mapUI.sel = ms.dataset.mapsel;
+      render();
+      const p = $('#mapwrap'); if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return true;
+    }
+    const gd = el.closest('[data-godomain]');
+    if (gd) { go({ view: 'domains', domain: gd.dataset.godomain }); return true; }
+    const au = el.closest('[data-audit]');
+    if (au) { auditAction(au.dataset.audit); return true; }
+    return false;
+  }
+
+  async function auditAction(spec) {
+    const [k, act, arg] = spec.split(':');
+    if (act === 'reset') { db.meta.auditIgnore = []; save(); render(); return; }
+    const a = mapUI.audit[+k];
+    if (!a) return;
+    const keepY = () => { const y = window.scrollY; render(); window.scrollTo(0, y); };
+    if (act === 'ignore') { db.meta.auditIgnore.push(a.key); save(); keepY(); return; }
+    if (act === 'merge') {
+      const r = renameTag(a.drop, a.keep); keepY();
+      toast(`#${a.drop} fusionada en #${a.keep}`, 'Deshacer', () => { r.undo(); keepY(); });
+      return;
+    }
+    if (act === 'removeDrop' || act === 'remove') {
+      const t = act === 'remove' ? arg : a.drop;
+      const r = renameTag(t, ''); keepY();
+      toast(`#${t} quitada`, 'Deshacer', () => { r.undo(); keepY(); });
+      return;
+    }
+    if (act === 'move') {
+      const prev = db.meta.tagDomain[a.tag];
+      db.meta.tagDomain[a.tag] = a.to; save(); keepY();
+      toast(`#${a.tag} → ${(domainById(a.to) || {}).name}`, 'Deshacer', () => { db.meta.tagDomain[a.tag] = prev; save(); keepY(); });
+      return;
+    }
+    if (act === 'entry') {
+      const it = byId(a.id); if (!it) return;
+      const prev = it.domain;
+      it.domain = arg; stamp(it); save(); keepY();
+      toast(`Entrada → ${(domainById(arg) || {}).name}`, 'Deshacer', () => { it.domain = prev; save(); keepY(); });
+    }
+  }
+
   /* ---------------- Selector de dominio ---------------- */
   const dpick = $('#dpick');
   let dpickResolve = null;
@@ -497,7 +824,7 @@
     $('#dpickTitle').textContent = title;
     $('#dpickSub').textContent = sub;
     $('#dpickList').innerHTML = db.meta.domains.map((d) =>
-      `<button class="dombtn${d.id === current ? ' on' : ''}" data-pick="${d.id}" style="--dc:${d.color}">${dot(d)}<span>${esc(d.name)}</span>${d.id === suggested ? '<small>sugerido</small>' : ''}</button>`).join('') +
+      `<button class="dombtn${d.id === current ? ' on' : ''}" data-pick="${d.id}" style="--dc:${col(d)}">${dot(d)}<span>${esc(d.name)}</span>${d.id === suggested ? '<small>sugerido</small>' : ''}</button>`).join('') +
       (clearLabel ? `<button class="dombtn clear" data-pick="">${esc(clearLabel)}</button>` : '');
     dpick.hidden = false;
     return new Promise((res) => { dpickResolve = res; });
@@ -596,7 +923,7 @@
     input.value = '';
     preview.innerHTML = '';
     if (ui.view === 'search') { stack = []; ui.view = 'inbox'; }
-    if (ui.view === 'inbox') ui.inboxMode = it.someday ? 'someday' : 'active';
+    if (ui.view === 'inbox') ui.inboxMode = it.someday ? 'someday' : keyDate(it) ? 'dates' : 'triage';
     render();
     const newTag = !domainOf(it) && it.tags.find((t) => !domainById(db.meta.tagDomain[t]));
     if (newTag) toast(`#${newTag} no tiene dominio`, 'Asignar', () => mapTagFlow(newTag));
@@ -607,6 +934,9 @@
   /* ---------------- Interacción en listas ---------------- */
   main.addEventListener('click', async (e) => {
     const el = e.target;
+    if (ui.view === 'map' && mapClick(el)) return;
+    const goa = el.closest('[data-goaudit]');
+    if (goa) { go({ view: 'map' }); const a = $('#audit'); if (a) a.scrollIntoView({ block: 'start' }); return; }
     const modeBtn = el.closest('[data-mode]');
     if (modeBtn) { ui.inboxMode = modeBtn.dataset.mode; render(); return; }
     if (el.closest('[data-action="export"]')) { exportData(); return; }
@@ -636,6 +966,13 @@
     if (!inItem) return;
     const it = byId(inItem.dataset.id);
     if (!it) return;
+    if (el.closest('.tri-date')) {
+      const inp = inItem.querySelector('[data-tri-date]');
+      if (!('ontouchstart' in window) && inp.showPicker) { try { inp.showPicker(); } catch (_) {} }
+      return;
+    }
+    const tri = el.closest('[data-tri]');
+    if (tri) { triageAction(it, tri.dataset.tri, inItem); return; }
     if (el.closest('.check')) {
       const prev = statusOf(it), prevFocus = it.focus, prevFocusAt = it.focusAt;
       setStatus(it, it.done ? 'active' : 'done');
@@ -652,6 +989,38 @@
   main.addEventListener('input', (e) => {
     if (e.target.id === 'searchInput') { ui.query = e.target.value; render(); }
   });
+
+  main.addEventListener('change', (e) => {
+    if (!e.target.matches('[data-tri-date]') || !e.target.value) return;
+    const row = e.target.closest('.item');
+    const it = row && byId(row.dataset.id);
+    if (!it) return;
+    it.date = e.target.value; stamp(it); save();
+    row.classList.add('leaving');
+    setTimeout(render, 220);
+    toast(`Fecha: ${dateLabel(it.date)}`, 'Deshacer', () => { it.date = null; stamp(it); save(); render(); });
+  });
+
+  function triageAction(it, kind, row) {
+    const leave = () => { row.classList.add('leaving'); setTimeout(render, 220); };
+    if (kind === 'focus') {
+      const why = setFocus(it, true);
+      if (why === 'full') { alert(`Ya tienes ${FOCUS_MAX} cosas en foco:\n\n• ${focusItems().map((i) => i.text).join('\n• ')}\n\nTermina o quita una antes de agregar otra.`); return; }
+      if (why === 'work') { alert('Tus otras 2 en foco ya son de Trabajo.\n\nLa tercera tiene que ser algo para ti: Disfrute, Cuerpo, Mente…'); return; }
+      save(); leave();
+      toast('★ En foco', 'Deshacer', () => { setFocus(it, false); save(); render(); });
+      return;
+    }
+    if (kind === 'someday') {
+      setStatus(it, 'someday'); save(); leave();
+      toast('A algún día', 'Deshacer', () => { setStatus(it, 'active'); save(); render(); });
+      return;
+    }
+    if (kind === 'delete') {
+      const undo = removeItem(it); leave();
+      toast('Entrada borrada', 'Deshacer', () => { undo(); render(); });
+    }
+  }
 
   function domainAction(kind) {
     if (kind === 'allTags') { go({ view: 'tags', tag: null }); return; }
@@ -935,7 +1304,7 @@
 
   async function exportData() {
     const name = `personal-os-${todayISO()}.json`;
-    const meta = { domains: db.meta.domains, tagDomain: db.meta.tagDomain };
+    const meta = { domains: db.meta.domains, tagDomain: db.meta.tagDomain, auditIgnore: db.meta.auditIgnore };
     const json = JSON.stringify({ app: 'personal-os', schema: SCHEMA, exportedAt: new Date().toISOString(), meta, items: db.items }, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     try {

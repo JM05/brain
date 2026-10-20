@@ -41,8 +41,8 @@
     <button data-view="inbox" class="active">
       <svg viewBox="0 0 24 24"><path d="M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z"/></svg><span>Inbox</span>
     </button>
-    <button data-view="today">
-      <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Fechas</span>
+    <button data-view="map">
+      <svg viewBox="0 0 24 24"><circle cx="6" cy="7" r="2.3"/><circle cx="17.5" cy="5.5" r="2.3"/><circle cx="12" cy="13" r="3"/><circle cx="5.5" cy="18.5" r="2"/><circle cx="18.5" cy="17.5" r="2.3"/><path d="M7.8 8.4l2.2 2.4M15.7 6.9l-2.1 3.6M9.9 15l-2.8 2.3M14.6 14.6l2.2 1.6"/></svg><span>Mapa</span>
     </button>
     <button data-view="domains">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5V12l6 6"/></svg><span>Dominios</span>
@@ -119,7 +119,7 @@
       <button id="importBtn" class="ghostbtn">Importar desde JSON</button>
       <input id="importFile" type="file" accept="application/json,.json" hidden>
       <p class="fineprint">Tus entradas viven solo en este iPhone (almacenamiento local de la app, clave <code>pos.v1</code>). No se suben a GitHub ni a ningún servidor. Exporta con frecuencia y guarda el archivo en iCloud Drive. Importar combina por ID: agrega lo nuevo y actualiza lo más reciente; nunca borra.</p>
-      <p class="fineprint">Personal OS · V0.2</p>
+      <p class="fineprint">Personal OS · V0.3</p>
     </div>
   </div>
 
@@ -140,6 +140,7 @@
   <div id="toast" class="toast" hidden><span></span><button></button></div>
 
   <script src="parse.js"></script>
+  <script src="map.js"></script>
   <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

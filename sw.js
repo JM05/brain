@@ -1,7 +1,7 @@
 /* Personal OS · service worker: red primero (para que veas cada actualización), caché como respaldo sin conexión.
    No toca tus datos: esos viven en localStorage, no aquí. */
-const CACHE = 'pos-v0-3';
-const ASSETS = ['./', './index.html', './styles.css', './parse.js', './app.js', './manifest.webmanifest', './icon-180.png', './icon-512.png'];
+const CACHE = 'pos-v0-4';
+const ASSETS = ['./', './index.html', './styles.css', './parse.js', './map.js', './app.js', './manifest.webmanifest', './icon-180.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
